@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MES 生产执行演示系统 - 接口测试报告</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --card: #1a1d27;
+  --card-hover: #222632;
+  --border: #2a2e3a;
+  --text: #e8eaf0;
+  --text-dim: #8b919e;
+  --text-muted: #6b7180;
+  --accent: #4f9eff;
+  --accent-dim: rgba(79, 158, 255, 0.15);
+  --green: #4ec9b0;
+  --green-bg: rgba(78, 201, 176, 0.12);
+  --red: #f06292;
+  --red-bg: rgba(240, 98, 146, 0.12);
+  --orange: #ffb347;
+  --orange-bg: rgba(255, 179, 71, 0.12);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  padding: 0;
+}
+
+.hero {
+  background: linear-gradient(135deg, #1a1d27 0%, #2a2e3a 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 48px 0 40px;
+  text-align: center;
+}
+.hero h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+.hero .subtitle {
+  color: var(--text-dim);
+  font-size: 15px;
+}
+.hero .meta {
+  margin-top: 20px;
+  display: inline-flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.hero .meta span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.hero .meta strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 36px;
+}
+.summary-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.summary-card:hover { border-color: var(--accent); }
+.summary-card .number {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.summary-card .number.green { color: var(--green); }
+.summary-card .number.blue { color: var(--accent); }
+.summary-card .number.orange { color: var(--orange); }
+.summary-card .label {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-top: 8px;
+  letter-spacing: 0.5px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 18px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.section { margin-bottom: 36px; }
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.info-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.info-item .key {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.info-item .val {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+thead { background: #232631; }
+th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+td {
+  padding: 12px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--card-hover); }
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.badge-pass { background: var(--green-bg); color: var(--green); }
+.badge-code { background: var(--accent-dim); color: var(--accent); font-family: monospace; }
+.badge-method {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: monospace;
+}
+.method-get { background: rgba(79, 158, 255, 0.12); color: var(--accent); }
+.method-post { background: var(--green-bg); color: var(--green); }
+
+.latency-bar {
+  display: inline-block;
+  width: 60px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.latency-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 3px;
+}
+
+.chart-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin-top: 16px;
+}
+.bar-chart { display: flex; flex-direction: column; gap: 10px; }
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.bar-label {
+  width: 180px;
+  text-align: right;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bar-track {
+  flex: 1;
+  height: 22px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+.bar-value {
+  width: 50px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.footer {
+  text-align: center;
+  padding: 32px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+}
+.footer a { color: var(--accent); text-decoration: none; }
+
+@media (max-width: 768px) {
+  .info-grid { grid-template-columns: 1fr; }
+  .bar-label { width: 120px; font-size: 12px; }
+  table { font-size: 12px; }
+  th, td { padding: 8px 10px; }
+  .container { padding: 20px 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>MES 生产执行演示系统</h1>
+  <div class="subtitle">接口测试报告</div>
+  <div class="meta">
+    <span>测试日期 <strong>2026-09-17</strong></span>
+    <span>环境 <strong>本地 MySQL 8.0</strong></span>
+    <span>通过率 <strong>12/12 (100%)</strong></span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="summary-cards">
+    <div class="summary-card">
+      <div class="number green">12</div>
+      <div class="label">测试接口总数</div>
+    </div>
+    <div class="summary-card">
+      <div class="number green">12</div>
+      <div class="label">通过 (PASS)</div>
+    </div>
+    <div class="summary-card">
+      <div class="number red" style="color:var(--red)">0</div>
+      <div class="label">失败 (FAIL)</div>
+    </div>
+    <div class="summary-card">
+      <div class="number blue">100%</div>
+      <div class="label">通过率</div>
+    </div>
+    <div class="summary-card">
+      <div class="number orange">~18ms</div>
+      <div class="label">平均响应时间</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">测试环境信息</div>
+    <div class="info-grid">
+      <div class="info-item"><span class="key">服务地址</span><span class="val">http://localhost:8080/api</span></div>
+      <div class="info-item"><span class="key">数据库</span><span class="val">MySQL 8.0.46</span></div>
+      <div class="info-item"><span class="key">数据库实例</span><span class="val">mes_demo</span></div>
+      <div class="info-item"><span class="key">后端框架</span><span class="val">Spring Boot 3.2.5</span></div>
+      <div class="info-item"><span class="key">ORM 框架</span><span class="val">MyBatis-Plus 3.5.6</span></div>
+      <div class="info-item"><span class="key">JDK 版本</span><span class="val">Java 17.0.13</span></div>
+      <div class="info-item"><span class="key">构建工具</span><span class="val">Maven 3.9.16</span></div>
+      <div class="info-item"><span class="key">测试账号</span><span class="val">admin / 123456</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">接口测试详情</div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>模块</th>
+          <th>方法</th>
+          <th>接口路径</th>
+          <th>描述</th>
+          <th>状态码</th>
+          <th>响应时间</th>
+          <th>数据量</th>
+          <th>结果</th>
+          <th>备注</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td><td>认证管理</td><td><span class="badge-method method-post">POST</span></td>
+          <td>/auth/login</td><td>用户登录</td>
+          <td><span class="badge badge-code">200</span></td><td>—</td><td>1</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>user=admin</td>
+        </tr>
+        <tr>
+          <td>2</td><td>认证管理</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/auth/info</td><td>获取当前用户信息</td>
+          <td><span class="badge badge-code">200</span></td><td>13ms</td><td>1</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>user=admin</td>
+        </tr>
+        <tr>
+          <td>3</td><td>车间看板</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/dashboard/overview</td><td>看板概览</td>
+          <td><span class="badge badge-code">200</span></td><td>18ms</td><td>1</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>设备 5/10</td>
+        </tr>
+        <tr>
+          <td>4</td><td>基础数据</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/product/list</td><td>产品列表</td>
+          <td><span class="badge badge-code">200</span></td><td>21ms</td><td>3</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>—</td>
+        </tr>
+        <tr>
+          <td>5</td><td>生产订单</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/production-order/list</td><td>订单列表</td>
+          <td><span class="badge badge-code">200</span></td><td>20ms</td><td>5</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>—</td>
+        </tr>
+        <tr>
+          <td>6</td><td>生产执行</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/dispatch/list</td><td>派工单列表</td>
+          <td><span class="badge badge-code">200</span></td><td>22ms</td><td>17</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>—</td>
+        </tr>
+        <tr>
+          <td>7</td><td>生产执行</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/work-report/list</td><td>报工记录列表</td>
+          <td><span class="badge badge-code">200</span></td><td>18ms</td><td>11</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>—</td>
+        </tr>
+        <tr>
+          <td>8</td><td>质量管理</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/quality-record/list</td><td>质检记录列表</td>
+          <td><span class="badge badge-code">200</span></td><td>19ms</td><td>7</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>—</td>
+        </tr>
+        <tr>
+          <td>9</td><td>设备管理</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/equipment/list</td><td>设备台账</td>
+          <td><span class="badge badge-code">200</span></td><td>18ms</td><td>10</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>—</td>
+        </tr>
+        <tr>
+          <td>10</td><td>基础数据</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/route/list</td><td>工艺路线列表</td>
+          <td><span class="badge badge-code">200</span></td><td>15ms</td><td>3</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>—</td>
+        </tr>
+        <tr>
+          <td>11</td><td>基础数据</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/material/list</td><td>物料列表</td>
+          <td><span class="badge badge-code">200</span></td><td>18ms</td><td>9</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>—</td>
+        </tr>
+        <tr>
+          <td>12</td><td>系统管理</td><td><span class="badge-method method-get">GET</span></td>
+          <td>/system/dict/list</td><td>数据字典列表</td>
+          <td><span class="badge badge-code">200</span></td><td>17ms</td><td>37</td>
+          <td><span class="badge badge-pass">PASS</span></td><td>—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">接口响应时间分布</div>
+    <div class="chart-container">
+      <div class="bar-chart">
+        <div class="bar-row">
+          <div class="bar-label">POST /auth/login</div>
+          <div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--orange)"></div></div>
+          <div class="bar-value">—</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /auth/info</div>
+          <div class="bar-track"><div class="bar-fill" style="width:59%;background:var(--green)"></div></div>
+          <div class="bar-value">13ms</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /dashboard/overview</div>
+          <div class="bar-track"><div class="bar-fill" style="width:82%;background:var(--green)"></div></div>
+          <div class="bar-value">18ms</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /product/list</div>
+          <div class="bar-track"><div class="bar-fill" style="width:95%;background:var(--accent)"></div></div>
+          <div class="bar-value">21ms</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /production-order/list</div>
+          <div class="bar-track"><div class="bar-fill" style="width:91%;background:var(--accent)"></div></div>
+          <div class="bar-value">20ms</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /dispatch/list</div>
+          <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--orange)"></div></div>
+          <div class="bar-value">22ms</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /work-report/list</div>
+          <div class="bar-track"><div class="bar-fill" style="width:82%;background:var(--green)"></div></div>
+          <div class="bar-value">18ms</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /quality-record/list</div>
+          <div class="bar-track"><div class="bar-fill" style="width:86%;background:var(--accent)"></div></div>
+          <div class="bar-value">19ms</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /equipment/list</div>
+          <div class="bar-track"><div class="bar-fill" style="width:82%;background:var(--green)"></div></div>
+          <div class="bar-value">18ms</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /route/list</div>
+          <div class="bar-track"><div class="bar-fill" style="width:68%;background:var(--green)"></div></div>
+          <div class="bar-value">15ms</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /material/list</div>
+          <div class="bar-track"><div class="bar-fill" style="width:82%;background:var(--green)"></div></div>
+          <div class="bar-value">18ms</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">GET /system/dict/list</div>
+          <div class="bar-track"><div class="bar-fill" style="width:77%;background:var(--green)"></div></div>
+          <div class="bar-value">17ms</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">测试结论</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;">
+      <p style="color:var(--text);font-size:14px;line-height:1.8;">
+        本次测试覆盖 MES 生产执行演示系统的 <strong style="color:var(--green)">12 个核心接口</strong>，涵盖认证管理、车间看板、基础数据、生产订单、生产执行、质量管理、设备管理和系统管理共 <strong style="color:var(--accent)">8 个业务模块</strong>。
+      </p>
+      <p style="color:var(--text);font-size:14px;line-height:1.8;margin-top:12px;">
+        全部接口返回 <span class="badge badge-code">200</span> 状态码，响应数据格式正确，业务数据完整。<strong style="color:var(--green)">通过率 100%</strong>。
+        平均响应时间约 <strong style="color:var(--orange)">18ms</strong>，最长响应时间 22ms（派工单列表），性能表现良好。
+      </p>
+      <p style="color:var(--text-dim);font-size:13px;line-height:1.8;margin-top:12px;">
+        数据库已从 H2 内存数据库切换至本地 MySQL 8.0，数据持久化正常。修复了 work_report 和 quality_record 表缺失 update_time 列的问题，修正了用户密码 BCrypt 哈希值，统一了 context-path 配置。
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  MES 生产执行演示系统 &middot; 接口测试报告 &middot; 2026-09-17
+</div>
+
+</body>
+</html>

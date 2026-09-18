@@ -1,0 +1,97 @@
+package com.demo.mes.controller;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.demo.mes.common.result.PageResult;
+import com.demo.mes.common.result.Result;
+import com.demo.mes.entity.Bom;
+import com.demo.mes.entity.Material;
+import com.demo.mes.mapper.BomMapper;
+import com.demo.mes.mapper.MaterialMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Tag(name = "物料管理")
+@RestController
+@RequestMapping("/material")
+public class MaterialController {
+
+    private final MaterialMapper materialMapper;
+    private final BomMapper bomMapper;
+
+    @Autowired
+    public MaterialController(MaterialMapper materialMapper, BomMapper bomMapper) {
+        this.materialMapper = materialMapper;
+        this.bomMapper = bomMapper;
+    }
+
+    @Operation(summary = "物料分页列表")
+    @GetMapping("/list")
+    public Result<PageResult<Material>> list(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String keyword) {
+        Page<Material> pageObj = new Page<>(page, size);
+        LambdaQueryWrapper<Material> wrapper = new LambdaQueryWrapper<>();
+        if (keyword != null && !keyword.isBlank()) {
+            wrapper.like(Material::getMaterialCode, keyword).or().like(Material::getMaterialName, keyword);
+        }
+        wrapper.orderByDesc(Material::getCreateTime);
+        materialMapper.selectPage(pageObj, wrapper);
+        return Result.success(new PageResult<>(pageObj.getRecords(), pageObj.getTotal(), page, size));
+    }
+
+    @Operation(summary = "全部物料")
+    @GetMapping("/all")
+    public Result<List<Material>> all() {
+        return Result.success(materialMapper.selectList(
+                new LambdaQueryWrapper<Material>().eq(Material::getStatus, 1)));
+    }
+
+    @Operation(summary = "新增物料")
+    @PostMapping
+    public Result<Void> create(@RequestBody Material material) {
+        materialMapper.insert(material);
+        return Result.success("新增成功", null);
+    }
+
+    @Operation(summary = "修改物料")
+    @PutMapping("/{id}")
+    public Result<Void> update(@PathVariable Long id, @RequestBody Material material) {
+        material.setId(id);
+        materialMapper.updateById(material);
+        return Result.success("修改成功", null);
+    }
+
+    @Operation(summary = "删除物料")
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        materialMapper.deleteById(id);
+        return Result.success("删除成功", null);
+    }
+
+    @Operation(summary = "产品BOM列表")
+    @GetMapping("/bom/{materialId}")
+    public Result<List<Bom>> bomList(@PathVariable Long materialId) {
+        return Result.success(bomMapper.selectList(
+                new LambdaQueryWrapper<Bom>().eq(Bom::getParentMaterialId, materialId)));
+    }
+
+    @Operation(summary = "新增BOM项")
+    @PostMapping("/bom")
+    public Result<Void> createBom(@RequestBody Bom bom) {
+        bomMapper.insert(bom);
+        return Result.success("新增成功", null);
+    }
+
+    @Operation(summary = "删除BOM项")
+    @DeleteMapping("/bom/{id}")
+    public Result<Void> deleteBom(@PathVariable Long id) {
+        bomMapper.deleteById(id);
+        return Result.success("删除成功", null);
+    }
+}
