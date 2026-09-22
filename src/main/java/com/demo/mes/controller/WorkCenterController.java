@@ -9,6 +9,7 @@ import com.demo.mes.mapper.WorkCenterMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,7 +35,7 @@ public class WorkCenterController {
         Page<WorkCenter> pageObj = new Page<>(page, size);
         LambdaQueryWrapper<WorkCenter> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isBlank()) {
-            wrapper.like(WorkCenter::getCenterCode, keyword).or().like(WorkCenter::getCenterName, keyword);
+            wrapper.and(w -> w.like(WorkCenter::getCenterCode, keyword).or().like(WorkCenter::getCenterName, keyword));
         }
         wrapper.orderByAsc(WorkCenter::getCenterCode);
         workCenterMapper.selectPage(pageObj, wrapper);
@@ -48,6 +49,7 @@ public class WorkCenterController {
     }
 
     @Operation(summary = "新增工作中心")
+    @PreAuthorize("hasAuthority('base:workcenter') or hasAuthority('*:*:*')")
     @PostMapping
     public Result<Void> create(@RequestBody WorkCenter workCenter) {
         workCenterMapper.insert(workCenter);
@@ -55,6 +57,7 @@ public class WorkCenterController {
     }
 
     @Operation(summary = "修改工作中心")
+    @PreAuthorize("hasAuthority('base:workcenter') or hasAuthority('*:*:*')")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody WorkCenter workCenter) {
         workCenter.setId(id);
@@ -63,6 +66,7 @@ public class WorkCenterController {
     }
 
     @Operation(summary = "删除工作中心")
+    @PreAuthorize("hasAuthority('base:workcenter') or hasAuthority('*:*:*')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         workCenterMapper.deleteById(id);

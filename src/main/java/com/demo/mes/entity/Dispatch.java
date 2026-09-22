@@ -1,5 +1,6 @@
 package com.demo.mes.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
@@ -18,6 +19,16 @@ public class Dispatch extends BaseEntity {
     private LocalDateTime plannedEndTime;
     private LocalDateTime actualStartTime;
     private LocalDateTime actualEndTime;
+
+    /** 以下为关联展示字段，不映射数据库列 */
+    @TableField(exist = false)
+    private String orderNo;
+    @TableField(exist = false)
+    private String stepName;
+    @TableField(exist = false)
+    private String workCenterName;
+    @TableField(exist = false)
+    private String operatorName;
 
     public String getDispatchNo() {
         return dispatchNo;
@@ -121,5 +132,37 @@ public class Dispatch extends BaseEntity {
 
     public void setActualEndTime(LocalDateTime actualEndTime) {
         this.actualEndTime = actualEndTime;
+    }
+
+    public String getOrderNo() {
+        return orderNo;
+    }
+
+    public void setOrderNo(String orderNo) {
+        this.orderNo = orderNo;
+    }
+
+    public String getStepName() {
+        return stepName;
+    }
+
+    public void setStepName(String stepName) {
+        this.stepName = stepName;
+    }
+
+    public String getWorkCenterName() {
+        return workCenterName;
+    }
+
+    public void setWorkCenterName(String workCenterName) {
+        this.workCenterName = workCenterName;
+    }
+
+    public String getOperatorName() {
+        return operatorName;
+    }
+
+    public void setOperatorName(String operatorName) {
+        this.operatorName = operatorName;
     }
 }

@@ -1,6 +1,8 @@
 package com.demo.mes.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.util.List;
 
 @TableName("sys_permission")
 public class SysPermission extends BaseEntity {
@@ -13,6 +15,9 @@ public class SysPermission extends BaseEntity {
     private String icon;
     private Integer sort;
     private Integer status;
+
+    @TableField(exist = false)
+    private List<SysPermission> children;
 
     public Long getParentId() {
         return parentId;
@@ -84,5 +89,13 @@ public class SysPermission extends BaseEntity {
 
     public void setStatus(Integer status) {
         this.status = status;
+    }
+
+    public List<SysPermission> getChildren() {
+        return children;
+    }
+
+    public void setChildren(List<SysPermission> children) {
+        this.children = children;
     }
 }

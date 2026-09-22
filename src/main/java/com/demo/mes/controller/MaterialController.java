@@ -11,6 +11,7 @@ import com.demo.mes.mapper.MaterialMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,7 +39,7 @@ public class MaterialController {
         Page<Material> pageObj = new Page<>(page, size);
         LambdaQueryWrapper<Material> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isBlank()) {
-            wrapper.like(Material::getMaterialCode, keyword).or().like(Material::getMaterialName, keyword);
+            wrapper.and(w -> w.like(Material::getMaterialCode, keyword).or().like(Material::getMaterialName, keyword));
         }
         wrapper.orderByDesc(Material::getCreateTime);
         materialMapper.selectPage(pageObj, wrapper);
@@ -53,6 +54,7 @@ public class MaterialController {
     }
 
     @Operation(summary = "新增物料")
+    @PreAuthorize("hasAuthority('base:material') or hasAuthority('*:*:*')")
     @PostMapping
     public Result<Void> create(@RequestBody Material material) {
         materialMapper.insert(material);
@@ -60,6 +62,7 @@ public class MaterialController {
     }
 
     @Operation(summary = "修改物料")
+    @PreAuthorize("hasAuthority('base:material') or hasAuthority('*:*:*')")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Material material) {
         material.setId(id);
@@ -68,6 +71,7 @@ public class MaterialController {
     }
 
     @Operation(summary = "删除物料")
+    @PreAuthorize("hasAuthority('base:material') or hasAuthority('*:*:*')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         materialMapper.deleteById(id);
@@ -82,6 +86,7 @@ public class MaterialController {
     }
 
     @Operation(summary = "新增BOM项")
+    @PreAuthorize("hasAuthority('base:bom') or hasAuthority('*:*:*')")
     @PostMapping("/bom")
     public Result<Void> createBom(@RequestBody Bom bom) {
         bomMapper.insert(bom);
@@ -89,6 +94,7 @@ public class MaterialController {
     }
 
     @Operation(summary = "删除BOM项")
+    @PreAuthorize("hasAuthority('base:bom') or hasAuthority('*:*:*')")
     @DeleteMapping("/bom/{id}")
     public Result<Void> deleteBom(@PathVariable Long id) {
         bomMapper.deleteById(id);

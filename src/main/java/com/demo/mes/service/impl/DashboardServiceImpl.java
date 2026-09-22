@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -60,7 +61,7 @@ public class DashboardServiceImpl implements DashboardService {
         vo.setCompletedQty(completedQty);
         vo.setScrapQty(scrapQty);
         vo.setCompletionRate(plannedQty > 0 ? Math.round((double) completedQty / plannedQty * 100 * 100) / 100.0 : 0);
-        vo.setScrapRate(completedQty > 0 ? Math.round((double) scrapQty / (completedQty + scrapQty) * 100 * 100) / 100.0 : 0);
+        vo.setScrapRate((completedQty + scrapQty) > 0 ? Math.round((double) scrapQty / (completedQty + scrapQty) * 100 * 100) / 100.0 : 0);
         vo.setActiveOrderCount((int) todayOrders.stream().filter(o -> o.getStatus() == 2).count());
 
         List<Equipment> equipments = equipmentMapper.selectList(new LambdaQueryWrapper<>());
@@ -73,8 +74,26 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public List<Map<String, Object>> getWorkCenterStatus() {
         List<WorkCenter> centers = workCenterMapper.selectList(new LambdaQueryWrapper<>());
-        List<Map<String, Object>> result = new ArrayList<>();
+        if (centers.isEmpty()) {
+            return new ArrayList<>();
+        }
 
+        // 批量查询所有活跃派工单，按 workCenterId 分组
+        List<Long> centerIds = centers.stream().map(WorkCenter::getId).collect(Collectors.toList());
+        List<Dispatch> activeDispatches = dispatchMapper.selectList(
+                new LambdaQueryWrapper<Dispatch>()
+                        .in(Dispatch::getWorkCenterId, centerIds)
+                        .in(Dispatch::getStatus, 0, 1, 2));
+        Map<Long, List<Dispatch>> dispatchMap = activeDispatches.stream()
+                .collect(Collectors.groupingBy(Dispatch::getWorkCenterId));
+
+        // 批量查询所有设备，按 workCenterId 分组
+        List<Equipment> allEquipments = equipmentMapper.selectList(
+                new LambdaQueryWrapper<Equipment>().in(Equipment::getWorkCenterId, centerIds));
+        Map<Long, List<Equipment>> equipmentMap = allEquipments.stream()
+                .collect(Collectors.groupingBy(Equipment::getWorkCenterId));
+
+        List<Map<String, Object>> result = new ArrayList<>();
         for (WorkCenter wc : centers) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("workCenterId", wc.getId());
@@ -82,16 +101,12 @@ public class DashboardServiceImpl implements DashboardService {
             item.put("status", wc.getStatus());
             item.put("statusText", wc.getStatus() == 1 ? "运行中" : "停机");
 
-            List<Dispatch> activeDispatches = dispatchMapper.selectList(
-                    new LambdaQueryWrapper<Dispatch>()
-                            .eq(Dispatch::getWorkCenterId, wc.getId())
-                            .in(Dispatch::getStatus, 0, 1, 2));
-            item.put("activeDispatchCount", activeDispatches.size());
+            List<Dispatch> wcDispatches = dispatchMap.getOrDefault(wc.getId(), Collections.emptyList());
+            item.put("activeDispatchCount", wcDispatches.size());
 
-            List<Equipment> equipments = equipmentMapper.selectList(
-                    new LambdaQueryWrapper<Equipment>().eq(Equipment::getWorkCenterId, wc.getId()));
-            item.put("equipmentCount", equipments.size());
-            item.put("runningEquipmentCount", equipments.stream().filter(e -> e.getStatus() == 1).count());
+            List<Equipment> wcEquipments = equipmentMap.getOrDefault(wc.getId(), Collections.emptyList());
+            item.put("equipmentCount", wcEquipments.size());
+            item.put("runningEquipmentCount", wcEquipments.stream().filter(e -> e.getStatus() == 1).count());
 
             result.add(item);
         }
@@ -105,13 +120,30 @@ public class DashboardServiceImpl implements DashboardService {
                         .in(ProductionOrder::getStatus, 1, 2)
                         .orderByAsc(ProductionOrder::getPriority));
 
+        if (activeOrders.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 批量查询产品信息
+        Set<Long> productIds = activeOrders.stream().map(ProductionOrder::getProductId).collect(Collectors.toSet());
+        Map<Long, Product> productMap = productIds.isEmpty() ? Collections.emptyMap() :
+                productMapper.selectBatchIds(productIds).stream()
+                        .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        // 批量查询所有派工单，按 orderId 分组
+        List<Long> orderIds = activeOrders.stream().map(ProductionOrder::getId).collect(Collectors.toList());
+        List<Dispatch> allDispatches = dispatchMapper.selectList(
+                new LambdaQueryWrapper<Dispatch>().in(Dispatch::getOrderId, orderIds));
+        Map<Long, List<Dispatch>> dispatchMap = allDispatches.stream()
+                .collect(Collectors.groupingBy(Dispatch::getOrderId));
+
         List<Map<String, Object>> result = new ArrayList<>();
         for (ProductionOrder order : activeOrders) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("orderId", order.getId());
             item.put("orderNo", order.getOrderNo());
 
-            Product product = productMapper.selectById(order.getProductId());
+            Product product = productMap.get(order.getProductId());
             item.put("productName", product != null ? product.getProductName() : "-");
 
             item.put("plannedQty", order.getPlannedQty());
@@ -123,10 +155,9 @@ public class DashboardServiceImpl implements DashboardService {
                     ? Math.round((double) order.getCompletedQty() / order.getPlannedQty() * 100 * 100) / 100.0 : 0;
             item.put("progress", progress);
 
-            List<Dispatch> dispatches = dispatchMapper.selectList(
-                    new LambdaQueryWrapper<Dispatch>().eq(Dispatch::getOrderId, order.getId()));
-            item.put("totalSteps", dispatches.size());
-            item.put("completedSteps", dispatches.stream().filter(d -> d.getStatus() == 3).count());
+            List<Dispatch> orderDispatches = dispatchMap.getOrDefault(order.getId(), Collections.emptyList());
+            item.put("totalSteps", orderDispatches.size());
+            item.put("completedSteps", orderDispatches.stream().filter(d -> d.getStatus() == 3).count());
 
             result.add(item);
         }
@@ -223,30 +254,47 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public Map<String, Object> getOeeAnalysis() {
         List<WorkCenter> centers = workCenterMapper.selectList(new LambdaQueryWrapper<>());
-        List<Map<String, Object>> oeeList = new ArrayList<>();
+        if (centers.isEmpty()) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("workCenters", new ArrayList<>());
+            return result;
+        }
 
+        List<Long> centerIds = centers.stream().map(WorkCenter::getId).collect(Collectors.toList());
+
+        // 批量查询所有设备，按 workCenterId 分组
+        List<Equipment> allEquipments = equipmentMapper.selectList(
+                new LambdaQueryWrapper<Equipment>().in(Equipment::getWorkCenterId, centerIds));
+        Map<Long, List<Equipment>> equipmentMap = allEquipments.stream()
+                .collect(Collectors.groupingBy(Equipment::getWorkCenterId));
+
+        // 批量查询今天所有派工单，按 workCenterId 分组
+        LocalDateTime todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
+        List<Dispatch> todayDispatches = dispatchMapper.selectList(
+                new LambdaQueryWrapper<Dispatch>()
+                        .in(Dispatch::getWorkCenterId, centerIds)
+                        .ge(Dispatch::getActualStartTime, todayStart));
+        Map<Long, List<Dispatch>> dispatchMap = todayDispatches.stream()
+                .collect(Collectors.groupingBy(Dispatch::getWorkCenterId));
+
+        List<Map<String, Object>> oeeList = new ArrayList<>();
         for (WorkCenter wc : centers) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("workCenterName", wc.getCenterName());
 
-            List<Equipment> equipments = equipmentMapper.selectList(
-                    new LambdaQueryWrapper<Equipment>().eq(Equipment::getWorkCenterId, wc.getId()));
-            int runningCount = (int) equipments.stream().filter(e -> e.getStatus() == 1).count();
-            double availability = equipments.isEmpty() ? 0 : (double) runningCount / equipments.size() * 100;
+            List<Equipment> wcEquipments = equipmentMap.getOrDefault(wc.getId(), Collections.emptyList());
+            int runningCount = (int) wcEquipments.stream().filter(e -> e.getStatus() == 1).count();
+            double availability = wcEquipments.isEmpty() ? 0 : (double) runningCount / wcEquipments.size() * 100;
 
-            List<Dispatch> todayDispatches = dispatchMapper.selectList(
-                    new LambdaQueryWrapper<Dispatch>()
-                            .eq(Dispatch::getWorkCenterId, wc.getId())
-                            .ge(Dispatch::getActualStartTime,
-                                    LocalDateTime.of(LocalDate.now(), LocalTime.MIN)));
-            int totalGood = todayDispatches.stream().mapToInt(Dispatch::getCompletedQty).sum();
+            List<Dispatch> wcDispatches = dispatchMap.getOrDefault(wc.getId(), Collections.emptyList());
+            int totalGood = wcDispatches.stream().mapToInt(Dispatch::getCompletedQty).sum();
+            int totalScrap = wcDispatches.stream().mapToInt(Dispatch::getScrapQty).sum();
 
             double performance = wc.getCapacityPerHour().doubleValue() > 0
                     ? Math.min(100, totalGood / (wc.getCapacityPerHour().doubleValue() * 8) * 100) : 0;
 
-            double quality = totalGood > 0
-                    ? (double) todayDispatches.stream().mapToInt(Dispatch::getCompletedQty).sum()
-                    / (totalGood + todayDispatches.stream().mapToInt(Dispatch::getScrapQty).sum()) * 100
+            double quality = (totalGood + totalScrap) > 0
+                    ? (double) totalGood / (totalGood + totalScrap) * 100
                     : 100;
 
             double oee = availability * performance * quality / 10000;

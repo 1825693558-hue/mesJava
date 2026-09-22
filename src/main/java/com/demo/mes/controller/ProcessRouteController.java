@@ -11,6 +11,7 @@ import com.demo.mes.mapper.ProcessStepMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,7 +39,7 @@ public class ProcessRouteController {
         Page<ProcessRoute> pageObj = new Page<>(page, size);
         LambdaQueryWrapper<ProcessRoute> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isBlank()) {
-            wrapper.like(ProcessRoute::getRouteCode, keyword).or().like(ProcessRoute::getRouteName, keyword);
+            wrapper.and(w -> w.like(ProcessRoute::getRouteCode, keyword).or().like(ProcessRoute::getRouteName, keyword));
         }
         wrapper.orderByDesc(ProcessRoute::getCreateTime);
         routeMapper.selectPage(pageObj, wrapper);
@@ -53,6 +54,7 @@ public class ProcessRouteController {
     }
 
     @Operation(summary = "新增工艺路线")
+    @PreAuthorize("hasAuthority('base:route') or hasAuthority('*:*:*')")
     @PostMapping
     public Result<Void> create(@RequestBody ProcessRoute route) {
         routeMapper.insert(route);
@@ -60,6 +62,7 @@ public class ProcessRouteController {
     }
 
     @Operation(summary = "修改工艺路线")
+    @PreAuthorize("hasAuthority('base:route') or hasAuthority('*:*:*')")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody ProcessRoute route) {
         route.setId(id);
@@ -68,6 +71,7 @@ public class ProcessRouteController {
     }
 
     @Operation(summary = "删除工艺路线")
+    @PreAuthorize("hasAuthority('base:route') or hasAuthority('*:*:*')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         routeMapper.deleteById(id);
@@ -84,6 +88,7 @@ public class ProcessRouteController {
     }
 
     @Operation(summary = "新增工序")
+    @PreAuthorize("hasAuthority('base:route') or hasAuthority('*:*:*')")
     @PostMapping("/step")
     public Result<Void> createStep(@RequestBody ProcessStep step) {
         stepMapper.insert(step);
@@ -91,6 +96,7 @@ public class ProcessRouteController {
     }
 
     @Operation(summary = "修改工序")
+    @PreAuthorize("hasAuthority('base:route') or hasAuthority('*:*:*')")
     @PutMapping("/step/{id}")
     public Result<Void> updateStep(@PathVariable Long id, @RequestBody ProcessStep step) {
         step.setId(id);
@@ -99,6 +105,7 @@ public class ProcessRouteController {
     }
 
     @Operation(summary = "删除工序")
+    @PreAuthorize("hasAuthority('base:route') or hasAuthority('*:*:*')")
     @DeleteMapping("/step/{id}")
     public Result<Void> deleteStep(@PathVariable Long id) {
         stepMapper.deleteById(id);

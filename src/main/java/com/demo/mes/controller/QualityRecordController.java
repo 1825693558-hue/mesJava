@@ -1,15 +1,16 @@
 package com.demo.mes.controller;
 
+import com.demo.mes.security.LoginUser;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.demo.mes.common.result.PageResult;
 import com.demo.mes.common.result.Result;
 import com.demo.mes.entity.QualityRecord;
 import com.demo.mes.mapper.QualityRecordMapper;
-import com.demo.mes.security.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -44,6 +45,7 @@ public class QualityRecordController {
     }
 
     @Operation(summary = "提交质检记录")
+    @PreAuthorize("hasAuthority('quality:record') or hasAuthority('*:*:*')")
     @PostMapping
     public Result<Void> create(@RequestBody QualityRecord record) {
         LoginUser loginUser = (LoginUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();

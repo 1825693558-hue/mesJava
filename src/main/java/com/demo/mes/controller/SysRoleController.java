@@ -2,16 +2,21 @@ package com.demo.mes.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.demo.mes.common.exception.BusinessException;
 import com.demo.mes.common.result.PageResult;
 import com.demo.mes.common.result.Result;
 import com.demo.mes.entity.SysRole;
 import com.demo.mes.entity.SysRolePermission;
+import com.demo.mes.entity.SysUserRole;
 import com.demo.mes.mapper.SysRoleMapper;
 import com.demo.mes.mapper.SysRolePermissionMapper;
+import com.demo.mes.mapper.SysUserRoleMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,11 +28,15 @@ public class SysRoleController {
 
     private final SysRoleMapper sysRoleMapper;
     private final SysRolePermissionMapper sysRolePermissionMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
 
     @Autowired
-    public SysRoleController(SysRoleMapper sysRoleMapper, SysRolePermissionMapper sysRolePermissionMapper) {
+    public SysRoleController(SysRoleMapper sysRoleMapper,
+                             SysRolePermissionMapper sysRolePermissionMapper,
+                             SysUserRoleMapper sysUserRoleMapper) {
         this.sysRoleMapper = sysRoleMapper;
         this.sysRolePermissionMapper = sysRolePermissionMapper;
+        this.sysUserRoleMapper = sysUserRoleMapper;
     }
 
     @Operation(summary = "角色分页列表")
@@ -47,6 +56,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "新增角色")
+    @PreAuthorize("hasAuthority('system:role') or hasAuthority('*:*:*')")
     @PostMapping
     public Result<Void> create(@RequestBody SysRole role) {
         sysRoleMapper.insert(role);
@@ -54,6 +64,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "修改角色")
+    @PreAuthorize("hasAuthority('system:role') or hasAuthority('*:*:*')")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody SysRole role) {
         role.setId(id);
@@ -62,8 +73,19 @@ public class SysRoleController {
     }
 
     @Operation(summary = "删除角色")
+    @PreAuthorize("hasAuthority('system:role') or hasAuthority('*:*:*')")
     @DeleteMapping("/{id}")
+    @Transactional
     public Result<Void> delete(@PathVariable Long id) {
+        SysRole role = sysRoleMapper.selectById(id);
+        if (role == null) {
+            throw new BusinessException("角色不存在");
+        }
+        // 清理角色权限关联和用户角色关联
+        sysRolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermission>()
+                .eq(SysRolePermission::getRoleId, id));
+        sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getRoleId, id));
         sysRoleMapper.deleteById(id);
         return Result.success("删除成功", null);
     }
@@ -77,7 +99,9 @@ public class SysRoleController {
     }
 
     @Operation(summary = "分配角色权限")
+    @PreAuthorize("hasAuthority('system:role') or hasAuthority('*:*:*')")
     @PostMapping("/{id}/permissions")
+    @Transactional
     public Result<Void> assignPermissions(@PathVariable Long id, @RequestBody List<Long> permissionIds) {
         sysRolePermissionMapper.delete(
                 new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, id));

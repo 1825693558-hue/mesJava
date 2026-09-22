@@ -1,12 +1,17 @@
 package com.demo.mes.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.demo.mes.common.exception.BusinessException;
 import com.demo.mes.common.result.Result;
 import com.demo.mes.entity.SysPermission;
+import com.demo.mes.entity.SysRolePermission;
 import com.demo.mes.mapper.SysPermissionMapper;
+import com.demo.mes.mapper.SysRolePermissionMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,10 +23,13 @@ import java.util.stream.Collectors;
 public class SysPermissionController {
 
     private final SysPermissionMapper sysPermissionMapper;
+    private final SysRolePermissionMapper sysRolePermissionMapper;
 
     @Autowired
-    public SysPermissionController(SysPermissionMapper sysPermissionMapper) {
+    public SysPermissionController(SysPermissionMapper sysPermissionMapper,
+                                  SysRolePermissionMapper sysRolePermissionMapper) {
         this.sysPermissionMapper = sysPermissionMapper;
+        this.sysRolePermissionMapper = sysRolePermissionMapper;
     }
 
     @Operation(summary = "权限树")
@@ -33,6 +41,7 @@ public class SysPermissionController {
     }
 
     @Operation(summary = "新增权限")
+    @PreAuthorize("hasAuthority('system:permission') or hasAuthority('*:*:*')")
     @PostMapping
     public Result<Void> create(@RequestBody SysPermission permission) {
         sysPermissionMapper.insert(permission);
@@ -40,6 +49,7 @@ public class SysPermissionController {
     }
 
     @Operation(summary = "修改权限")
+    @PreAuthorize("hasAuthority('system:permission') or hasAuthority('*:*:*')")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody SysPermission permission) {
         permission.setId(id);
@@ -48,19 +58,25 @@ public class SysPermissionController {
     }
 
     @Operation(summary = "删除权限")
+    @PreAuthorize("hasAuthority('system:permission') or hasAuthority('*:*:*')")
     @DeleteMapping("/{id}")
+    @Transactional
     public Result<Void> delete(@PathVariable Long id) {
+        SysPermission permission = sysPermissionMapper.selectById(id);
+        if (permission == null) {
+            throw new BusinessException("权限不存在");
+        }
+        // 清理角色权限关联
+        sysRolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermission>()
+                .eq(SysRolePermission::getPermissionId, id));
         sysPermissionMapper.deleteById(id);
         return Result.success("删除成功", null);
     }
 
     private List<SysPermission> buildTree(List<SysPermission> all, Long parentId) {
         return all.stream()
-                .filter(p -> p.getParentId().equals(parentId))
-                .peek(p -> {
-                    List<SysPermission> children = buildTree(all, p.getId());
-                    // children can be set via reflection or custom VO; simplified for skeleton
-                })
+                .filter(p -> parentId.equals(p.getParentId()))
+                .peek(p -> p.setChildren(buildTree(all, p.getId())))
                 .collect(Collectors.toList());
     }
 }

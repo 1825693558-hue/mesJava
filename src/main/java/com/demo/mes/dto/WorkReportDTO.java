@@ -9,7 +9,11 @@ public class WorkReportDTO {
     @NotNull(message = "合格数量不能为空")
     @Min(value = 0, message = "合格数量不能为负")
     private Integer goodQty;
+    @NotNull(message = "不良数量不能为空")
+    @Min(value = 0, message = "不良数量不能为负")
     private Integer scrapQty = 0;
+    @NotNull(message = "返修数量不能为空")
+    @Min(value = 0, message = "返修数量不能为负")
     private Integer reworkQty = 0;
     private String scrapReason;
     private String remark;

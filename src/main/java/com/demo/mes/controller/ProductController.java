@@ -9,6 +9,7 @@ import com.demo.mes.mapper.ProductMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,7 +36,7 @@ public class ProductController {
         Page<Product> pageObj = new Page<>(page, size);
         LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isBlank()) {
-            wrapper.like(Product::getProductCode, keyword).or().like(Product::getProductName, keyword);
+            wrapper.and(w -> w.like(Product::getProductCode, keyword).or().like(Product::getProductName, keyword));
         }
         if (productType != null) wrapper.eq(Product::getProductType, productType);
         wrapper.orderByDesc(Product::getCreateTime);
@@ -51,6 +52,7 @@ public class ProductController {
     }
 
     @Operation(summary = "新增产品")
+    @PreAuthorize("hasAuthority('base:product') or hasAuthority('*:*:*')")
     @PostMapping
     public Result<Void> create(@RequestBody Product product) {
         productMapper.insert(product);
@@ -58,6 +60,7 @@ public class ProductController {
     }
 
     @Operation(summary = "修改产品")
+    @PreAuthorize("hasAuthority('base:product') or hasAuthority('*:*:*')")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Product product) {
         product.setId(id);
@@ -66,6 +69,7 @@ public class ProductController {
     }
 
     @Operation(summary = "删除产品")
+    @PreAuthorize("hasAuthority('base:product') or hasAuthority('*:*:*')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         productMapper.deleteById(id);

@@ -24,12 +24,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final UserDetailsServiceImpl userDetailsService;
-
-    @Autowired
-    public JwtAuthenticationFilter(JwtUtils jwtUtils, UserDetailsServiceImpl userDetailsService) {
-        this.jwtUtils = jwtUtils;
-        this.userDetailsService = userDetailsService;
-    }
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Value("${jwt.header}")
     private String header;
@@ -37,19 +32,36 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Value("${jwt.prefix}")
     private String prefix;
 
+    @Autowired
+    public JwtAuthenticationFilter(JwtUtils jwtUtils,
+                                   UserDetailsServiceImpl userDetailsService,
+                                   TokenBlacklistService tokenBlacklistService) {
+        this.jwtUtils = jwtUtils;
+        this.userDetailsService = userDetailsService;
+        this.tokenBlacklistService = tokenBlacklistService;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String token = resolveToken(request);
         if (StringUtils.hasText(token) && jwtUtils.validateToken(token)) {
-            String username = jwtUtils.getUsernameFromToken(token);
-            LoginUser loginUser = (LoginUser) userDetailsService.loadUserByUsername(username);
-            if (loginUser != null && loginUser.isEnabled()) {
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        loginUser, null, loginUser.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+            // 检查 token 是否已注销
+            if (!tokenBlacklistService.isBlacklisted(token)) {
+                try {
+                    String username = jwtUtils.getUsernameFromToken(token);
+                    LoginUser loginUser = (LoginUser) userDetailsService.loadUserByUsername(username);
+                    if (loginUser != null && loginUser.isEnabled()) {
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                loginUser, null, loginUser.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
+                } catch (Exception e) {
+                    // 用户不存在或已停用，不设置认证，继续走后续鉴权（返回401）
+                    log.debug("JWT 认证失败: {}", e.getMessage());
+                }
             }
         }
         filterChain.doFilter(request, response);

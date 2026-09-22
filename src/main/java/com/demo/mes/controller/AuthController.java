@@ -6,22 +6,24 @@ import com.demo.mes.entity.SysPermission;
 import com.demo.mes.mapper.SysPermissionMapper;
 import com.demo.mes.security.JwtUtils;
 import com.demo.mes.security.LoginUser;
+import com.demo.mes.security.TokenBlacklistService;
 import com.demo.mes.vo.LoginVO;
 import com.demo.mes.vo.MenuVO;
 import com.demo.mes.vo.UserInfoVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Tag(name = "认证管理")
@@ -32,12 +34,20 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
     private final SysPermissionMapper sysPermissionMapper;
+    private final TokenBlacklistService tokenBlacklistService;
+
+    @Value("${jwt.prefix}")
+    private String prefix;
 
     @Autowired
-    public AuthController(AuthenticationManager authenticationManager, JwtUtils jwtUtils, SysPermissionMapper sysPermissionMapper) {
+    public AuthController(AuthenticationManager authenticationManager,
+                          JwtUtils jwtUtils,
+                          SysPermissionMapper sysPermissionMapper,
+                          TokenBlacklistService tokenBlacklistService) {
         this.authenticationManager = authenticationManager;
         this.jwtUtils = jwtUtils;
         this.sysPermissionMapper = sysPermissionMapper;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     @Operation(summary = "用户登录")
@@ -84,7 +94,18 @@ public class AuthController {
 
     @Operation(summary = "退出登录")
     @PostMapping("/logout")
-    public Result<Void> logout() {
+    public Result<Void> logout(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(prefix)) {
+            String token = bearerToken.substring(prefix.length());
+            try {
+                // 将 token 加入黑名单，过期时间设为 token 的实际过期时间
+                long expireAt = jwtUtils.parseToken(token).getExpiration().getTime();
+                tokenBlacklistService.invalidate(token, expireAt);
+            } catch (Exception ignored) {
+                // token 已失效，无需加入黑名单
+            }
+        }
         SecurityContextHolder.clearContext();
         return Result.success("退出成功", null);
     }

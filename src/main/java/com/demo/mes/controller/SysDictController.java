@@ -7,6 +7,7 @@ import com.demo.mes.mapper.SysDictMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -45,6 +46,7 @@ public class SysDictController {
     }
 
     @Operation(summary = "新增字典")
+    @PreAuthorize("hasAuthority('system:dict') or hasAuthority('*:*:*')")
     @PostMapping
     public Result<Void> create(@RequestBody SysDict dict) {
         sysDictMapper.insert(dict);
@@ -52,6 +54,7 @@ public class SysDictController {
     }
 
     @Operation(summary = "修改字典")
+    @PreAuthorize("hasAuthority('system:dict') or hasAuthority('*:*:*')")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody SysDict dict) {
         dict.setId(id);
@@ -60,6 +63,7 @@ public class SysDictController {
     }
 
     @Operation(summary = "删除字典")
+    @PreAuthorize("hasAuthority('system:dict') or hasAuthority('*:*:*')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         sysDictMapper.deleteById(id);

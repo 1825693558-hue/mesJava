@@ -8,8 +8,8 @@ spring:
     name: mes-backend
   datasource:
     url: jdbc:mysql://localhost:3306/mes_demo?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: 112233
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:112233}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
@@ -25,14 +25,17 @@ mybatis-plus:
       logic-not-delete-value: 0
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
-# JWT 配置
+# JWT 配置（生产环境请通过环境变量覆盖 jwt.secret）
 jwt:
-  secret: mes-demo-secret-key-2026-must-be-at-least-32-characters
+  secret: ${JWT_SECRET:mes-demo-secret-key-2026-must-be-at-least-32-characters}
   expiration: 28800000
   header: Authorization
   prefix: "Bearer "
+
+# CORS 允许来源（逗号分隔）
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
 
 # Knife4j 文档
 knife4j:

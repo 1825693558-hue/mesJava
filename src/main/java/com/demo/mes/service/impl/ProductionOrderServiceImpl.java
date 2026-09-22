@@ -1,6 +1,7 @@
 package com.demo.mes.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.demo.mes.common.exception.BusinessException;
 import com.demo.mes.dto.ProductionOrderDTO;
@@ -14,13 +15,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductionOrderServiceImpl extends ServiceImpl<ProductionOrderMapper, ProductionOrder>
@@ -53,6 +53,10 @@ public class ProductionOrderServiceImpl extends ServiceImpl<ProductionOrderMappe
         if (product.getRouteId() == null) {
             throw new BusinessException("该产品未关联工艺路线，无法创建订单");
         }
+        if (dto.getPlannedStartTime() != null && dto.getPlannedEndTime() != null
+                && dto.getPlannedStartTime().isAfter(dto.getPlannedEndTime())) {
+            throw new BusinessException("计划开始时间不能晚于计划结束时间");
+        }
 
         ProductionOrder order = new ProductionOrder();
         order.setOrderNo(generateOrderNo());
@@ -74,9 +78,6 @@ public class ProductionOrderServiceImpl extends ServiceImpl<ProductionOrderMappe
         if (order == null) {
             throw new BusinessException("生产订单不存在");
         }
-        if (order.getStatus() != 0) {
-            throw new BusinessException("只有[已创建]状态的订单才能下发");
-        }
 
         Product product = productMapper.selectById(order.getProductId());
         if (product == null || product.getRouteId() == null) {
@@ -90,6 +91,16 @@ public class ProductionOrderServiceImpl extends ServiceImpl<ProductionOrderMappe
 
         if (steps.isEmpty()) {
             throw new BusinessException("工艺路线下没有工序，无法下发");
+        }
+
+        // CAS 条件更新：只有 status=0 时才能改为 status=1，防止并发重复下发
+        boolean released = baseMapper.update(null,
+                new LambdaUpdateWrapper<ProductionOrder>()
+                        .eq(ProductionOrder::getId, orderId)
+                        .eq(ProductionOrder::getStatus, 0)
+                        .set(ProductionOrder::getStatus, 1)) > 0;
+        if (!released) {
+            throw new BusinessException("订单已被下发或状态已变更");
         }
 
         for (ProcessStep step : steps) {
@@ -107,9 +118,6 @@ public class ProductionOrderServiceImpl extends ServiceImpl<ProductionOrderMappe
             dispatch.setPlannedEndTime(order.getPlannedEndTime());
             dispatchMapper.insert(dispatch);
         }
-
-        order.setStatus(1);
-        baseMapper.updateById(order);
     }
 
     @Override
@@ -121,6 +129,14 @@ public class ProductionOrderServiceImpl extends ServiceImpl<ProductionOrderMappe
         }
         if (order.getStatus() != 3) {
             throw new BusinessException("只有[已完成]状态的订单才能关闭");
+        }
+        // 校验该订单下所有派工单是否都已完成
+        Long unfinishedCount = dispatchMapper.selectCount(
+                new LambdaQueryWrapper<Dispatch>()
+                        .eq(Dispatch::getOrderId, orderId)
+                        .ne(Dispatch::getStatus, 3));
+        if (unfinishedCount > 0) {
+            throw new BusinessException("存在未完成的派工单，不能关闭订单");
         }
         order.setStatus(4);
         order.setActualEndTime(LocalDateTime.now());
@@ -141,20 +157,35 @@ public class ProductionOrderServiceImpl extends ServiceImpl<ProductionOrderMappe
                         .eq(Dispatch::getOrderId, orderId)
                         .orderByAsc(Dispatch::getDispatchNo));
 
+        // 批量查询消除 N+1
+        Set<Long> stepIds = dispatches.stream().map(Dispatch::getStepId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> workCenterIds = dispatches.stream().map(Dispatch::getWorkCenterId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> operatorIds = dispatches.stream().map(Dispatch::getOperatorId).filter(Objects::nonNull).collect(Collectors.toSet());
+
+        Map<Long, ProcessStep> stepMap = stepIds.isEmpty() ? Collections.emptyMap() :
+                processStepMapper.selectBatchIds(stepIds).stream()
+                        .collect(Collectors.toMap(ProcessStep::getId, Function.identity()));
+        Map<Long, WorkCenter> wcMap = workCenterIds.isEmpty() ? Collections.emptyMap() :
+                workCenterMapper.selectBatchIds(workCenterIds).stream()
+                        .collect(Collectors.toMap(WorkCenter::getId, Function.identity()));
+        Map<Long, SysUser> userMap = operatorIds.isEmpty() ? Collections.emptyMap() :
+                sysUserMapper.selectBatchIds(operatorIds).stream()
+                        .collect(Collectors.toMap(SysUser::getId, Function.identity()));
+
         List<DispatchProgressVO> dispatchVOs = new ArrayList<>();
         for (Dispatch d : dispatches) {
             DispatchProgressVO vo = new DispatchProgressVO();
             vo.setDispatchId(d.getId());
             vo.setDispatchNo(d.getDispatchNo());
 
-            ProcessStep step = processStepMapper.selectById(d.getStepId());
+            ProcessStep step = stepMap.get(d.getStepId());
             vo.setStepName(step != null ? step.getStepName() : "-");
 
-            WorkCenter wc = workCenterMapper.selectById(d.getWorkCenterId());
+            WorkCenter wc = wcMap.get(d.getWorkCenterId());
             vo.setWorkCenterName(wc != null ? wc.getCenterName() : "-");
 
             if (d.getOperatorId() != null) {
-                SysUser user = sysUserMapper.selectById(d.getOperatorId());
+                SysUser user = userMap.get(d.getOperatorId());
                 vo.setOperatorName(user != null ? user.getRealName() : "-");
             } else {
                 vo.setOperatorName("未指派");
@@ -186,10 +217,11 @@ public class ProductionOrderServiceImpl extends ServiceImpl<ProductionOrderMappe
         return result;
     }
 
-    private String generateOrderNo() {
+    private synchronized String generateOrderNo() {
         String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long count = baseMapper.selectCount(new LambdaQueryWrapper<>());
-        return "MO" + dateStr + String.format("%03d", count + 1);
+        long count = baseMapper.selectCount(new LambdaQueryWrapper<ProductionOrder>()
+                .likeRight(ProductionOrder::getOrderNo, "MO" + dateStr));
+        return "MO" + dateStr + String.format("%04d", count + 1);
     }
 
     private String generateDispatchNo(String orderNo, Integer stepNo) {
