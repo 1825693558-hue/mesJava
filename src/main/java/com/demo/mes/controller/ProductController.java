@@ -2,6 +2,7 @@ package com.demo.mes.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.demo.mes.common.exception.BusinessException;
 import com.demo.mes.common.result.PageResult;
 import com.demo.mes.common.result.Result;
 import com.demo.mes.entity.Product;
@@ -33,7 +34,7 @@ public class ProductController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer productType) {
-        Page<Product> pageObj = new Page<>(page, size);
+        Page<Product> pageObj = new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), 100));
         LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isBlank()) {
             wrapper.and(w -> w.like(Product::getProductCode, keyword).or().like(Product::getProductName, keyword));
@@ -51,10 +52,26 @@ public class ProductController {
                 new LambdaQueryWrapper<Product>().eq(Product::getStatus, 1)));
     }
 
+    @Operation(summary = "产品详情")
+    @GetMapping("/{id}")
+    public Result<Product> getById(@PathVariable Long id) {
+        Product product = productMapper.selectById(id);
+        if (product == null) {
+            throw new BusinessException("产品不存在");
+        }
+        return Result.success(product);
+    }
+
     @Operation(summary = "新增产品")
     @PreAuthorize("hasAuthority('base:product') or hasAuthority('*:*:*')")
     @PostMapping
     public Result<Void> create(@RequestBody Product product) {
+        if (product.getProductCode() == null || product.getProductCode().isBlank()) {
+            throw new BusinessException("产品编码不能为空");
+        }
+        if (product.getProductName() == null || product.getProductName().isBlank()) {
+            throw new BusinessException("产品名称不能为空");
+        }
         productMapper.insert(product);
         return Result.success("新增成功", null);
     }
@@ -63,6 +80,10 @@ public class ProductController {
     @PreAuthorize("hasAuthority('base:product') or hasAuthority('*:*:*')")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Product product) {
+        Product existing = productMapper.selectById(id);
+        if (existing == null) {
+            throw new BusinessException("产品不存在");
+        }
         product.setId(id);
         productMapper.updateById(product);
         return Result.success("修改成功", null);
@@ -72,6 +93,10 @@ public class ProductController {
     @PreAuthorize("hasAuthority('base:product') or hasAuthority('*:*:*')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
+        Product existing = productMapper.selectById(id);
+        if (existing == null) {
+            throw new BusinessException("产品不存在");
+        }
         productMapper.deleteById(id);
         return Result.success("删除成功", null);
     }

@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -46,6 +47,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public Result<Void> handleAccessDeniedException(AccessDeniedException e) {
         return Result.error(403, "权限不足");
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public Result<Void> handleBadCredentials(BadCredentialsException e) {
+        return Result.error(401, "用户名或密码错误");
     }
 
     @ExceptionHandler(AuthenticationException.class)

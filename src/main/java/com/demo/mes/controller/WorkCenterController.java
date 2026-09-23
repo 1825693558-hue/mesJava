@@ -2,6 +2,7 @@ package com.demo.mes.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.demo.mes.common.exception.BusinessException;
 import com.demo.mes.common.result.PageResult;
 import com.demo.mes.common.result.Result;
 import com.demo.mes.entity.WorkCenter;
@@ -32,7 +33,7 @@ public class WorkCenterController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String keyword) {
-        Page<WorkCenter> pageObj = new Page<>(page, size);
+        Page<WorkCenter> pageObj = new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), 100));
         LambdaQueryWrapper<WorkCenter> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isBlank()) {
             wrapper.and(w -> w.like(WorkCenter::getCenterCode, keyword).or().like(WorkCenter::getCenterName, keyword));
@@ -48,10 +49,26 @@ public class WorkCenterController {
         return Result.success(workCenterMapper.selectList(new LambdaQueryWrapper<>()));
     }
 
+    @Operation(summary = "工作中心详情")
+    @GetMapping("/{id}")
+    public Result<WorkCenter> getById(@PathVariable Long id) {
+        WorkCenter wc = workCenterMapper.selectById(id);
+        if (wc == null) {
+            throw new BusinessException("工作中心不存在");
+        }
+        return Result.success(wc);
+    }
+
     @Operation(summary = "新增工作中心")
     @PreAuthorize("hasAuthority('base:workcenter') or hasAuthority('*:*:*')")
     @PostMapping
     public Result<Void> create(@RequestBody WorkCenter workCenter) {
+        if (workCenter.getCenterCode() == null || workCenter.getCenterCode().isBlank()) {
+            throw new BusinessException("工作中心编码不能为空");
+        }
+        if (workCenter.getCenterName() == null || workCenter.getCenterName().isBlank()) {
+            throw new BusinessException("工作中心名称不能为空");
+        }
         workCenterMapper.insert(workCenter);
         return Result.success("新增成功", null);
     }
@@ -60,6 +77,10 @@ public class WorkCenterController {
     @PreAuthorize("hasAuthority('base:workcenter') or hasAuthority('*:*:*')")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody WorkCenter workCenter) {
+        WorkCenter existing = workCenterMapper.selectById(id);
+        if (existing == null) {
+            throw new BusinessException("工作中心不存在");
+        }
         workCenter.setId(id);
         workCenterMapper.updateById(workCenter);
         return Result.success("修改成功", null);
@@ -69,6 +90,10 @@ public class WorkCenterController {
     @PreAuthorize("hasAuthority('base:workcenter') or hasAuthority('*:*:*')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
+        WorkCenter existing = workCenterMapper.selectById(id);
+        if (existing == null) {
+            throw new BusinessException("工作中心不存在");
+        }
         workCenterMapper.deleteById(id);
         return Result.success("删除成功", null);
     }

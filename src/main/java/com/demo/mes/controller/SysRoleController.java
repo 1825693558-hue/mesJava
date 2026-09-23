@@ -67,6 +67,13 @@ public class SysRoleController {
     @PreAuthorize("hasAuthority('system:role') or hasAuthority('*:*:*')")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody SysRole role) {
+        SysRole existing = sysRoleMapper.selectById(id);
+        if (existing == null) {
+            throw new BusinessException("角色不存在");
+        }
+        if ("ADMIN".equals(existing.getRoleCode()) && role.getStatus() != null && role.getStatus() == 0) {
+            throw new BusinessException("系统管理员角色不能停用");
+        }
         role.setId(id);
         sysRoleMapper.updateById(role);
         return Result.success("修改成功", null);
@@ -80,6 +87,9 @@ public class SysRoleController {
         SysRole role = sysRoleMapper.selectById(id);
         if (role == null) {
             throw new BusinessException("角色不存在");
+        }
+        if ("ADMIN".equals(role.getRoleCode())) {
+            throw new BusinessException("系统管理员角色不允许删除");
         }
         // 清理角色权限关联和用户角色关联
         sysRolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermission>()
