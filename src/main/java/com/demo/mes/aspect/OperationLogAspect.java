@@ -27,24 +27,29 @@ public class OperationLogAspect {
         this.operationLogMapper = operationLogMapper;
     }
 
-    @Around("execution(* com.demo.mes.controller..*.*(..)) && " +
-            "(@annotation(org.springframework.web.bind.annotation.PostMapping) || " +
-            "@annotation(org.springframework.web.bind.annotation.PutMapping) || " +
-            "@annotation(org.springframework.web.bind.annotation.DeleteMapping))")
+    @Around("execution(* com.demo.mes.controller..*.*(..))")
     public Object logOperation(ProceedingJoinPoint joinPoint) throws Throwable {
         long start = System.currentTimeMillis();
         Object result = joinPoint.proceed();
         long cost = System.currentTimeMillis() - start;
 
         try {
-            saveLog(joinPoint, null, cost);
+            // 只记录写操作（POST/PUT/DELETE），不记录查询
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attrs != null) {
+                HttpServletRequest request = attrs.getRequest();
+                String method = request.getMethod();
+                if ("POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method)) {
+                    saveLog(joinPoint);
+                }
+            }
         } catch (Exception e) {
             // 记录日志失败不影响主流程
         }
         return result;
     }
 
-    private void saveLog(ProceedingJoinPoint joinPoint, String error, long cost) {
+    private void saveLog(ProceedingJoinPoint joinPoint) {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         String className = joinPoint.getTarget().getClass().getSimpleName();
         String methodName = signature.getName();
