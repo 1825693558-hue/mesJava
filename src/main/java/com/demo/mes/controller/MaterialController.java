@@ -106,8 +106,23 @@ public class MaterialController {
     @Operation(summary = "产品BOM列表")
     @GetMapping("/bom/{materialId}")
     public Result<List<Bom>> bomList(@PathVariable Long materialId) {
-        return Result.success(bomMapper.selectList(
-                new LambdaQueryWrapper<Bom>().eq(Bom::getParentMaterialId, materialId)));
+        List<Bom> list = bomMapper.selectList(
+                new LambdaQueryWrapper<Bom>().eq(Bom::getParentMaterialId, materialId));
+        // 批量查询子物料信息
+        if (!list.isEmpty()) {
+            List<Long> childIds = list.stream().map(Bom::getChildMaterialId).toList();
+            List<Material> materials = materialMapper.selectBatchIds(childIds);
+            java.util.Map<Long, Material> map = materials.stream()
+                    .collect(java.util.stream.Collectors.toMap(Material::getId, m -> m));
+            list.forEach(bom -> {
+                Material child = map.get(bom.getChildMaterialId());
+                if (child != null) {
+                    bom.setChildMaterialCode(child.getMaterialCode());
+                    bom.setChildMaterialName(child.getMaterialName());
+                }
+            });
+        }
+        return Result.success(list);
     }
 
     @Operation(summary = "新增BOM项")
