@@ -25,6 +25,7 @@ public class OperationLogAspect {
 
     public OperationLogAspect(OperationLogMapper operationLogMapper) {
         this.operationLogMapper = operationLogMapper;
+        System.out.println("=== OperationLogAspect loaded ===");
     }
 
     @Around("execution(* com.demo.mes.controller..*.*(..))")
