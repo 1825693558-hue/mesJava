@@ -8,6 +8,8 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -20,75 +22,70 @@ import java.time.LocalDateTime;
 @Component
 public class OperationLogAspect {
 
+    private static final Logger log = LoggerFactory.getLogger(OperationLogAspect.class);
+
     private final OperationLogMapper operationLogMapper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public OperationLogAspect(OperationLogMapper operationLogMapper) {
         this.operationLogMapper = operationLogMapper;
-        System.out.println("=== OperationLogAspect loaded ===");
     }
 
     @Around("execution(* com.demo.mes.controller..*.*(..))")
     public Object logOperation(ProceedingJoinPoint joinPoint) throws Throwable {
-        long start = System.currentTimeMillis();
         Object result = joinPoint.proceed();
-        long cost = System.currentTimeMillis() - start;
 
         try {
-            // 只记录写操作（POST/PUT/DELETE），不记录查询
             ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (attrs != null) {
                 HttpServletRequest request = attrs.getRequest();
-                String method = request.getMethod();
-                if ("POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method)) {
-                    saveLog(joinPoint);
+                String httpMethod = request.getMethod();
+                if ("POST".equals(httpMethod) || "PUT".equals(httpMethod) || "DELETE".equals(httpMethod)) {
+                    saveLog(joinPoint, request);
                 }
             }
         } catch (Exception e) {
-            // 记录日志失败不影响主流程
+            log.warn("记录操作日志失败: {}", e.getMessage());
         }
         return result;
     }
 
-    private void saveLog(ProceedingJoinPoint joinPoint) {
+    private void saveLog(ProceedingJoinPoint joinPoint, HttpServletRequest request) {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         String className = joinPoint.getTarget().getClass().getSimpleName();
         String methodName = signature.getName();
 
-        OperationLog log = new OperationLog();
+        OperationLog operationLog = new OperationLog();
 
-        // 获取当前登录用户
+        // 当前登录用户
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated()) {
-            log.setUsername(auth.getName());
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+            operationLog.setUsername(auth.getName());
+        } else {
+            operationLog.setUsername("匿名");
         }
 
-        // 模块和操作描述
+        // 模块和操作
         String module = className.replace("Controller", "");
-        log.setModule(module);
-        log.setOperation(methodName);
-        log.setMethod(className + "." + methodName);
+        operationLog.setModule(module);
+        operationLog.setOperation(methodName);
 
-        // 请求参数
+        // 请求参数（截断防止超长）
         try {
             Object[] args = joinPoint.getArgs();
-            if (args != null && args.length > 0) {
+            if (args != null && args.length > 0 && !(args[0] instanceof org.springframework.security.core.Authentication)) {
                 String params = objectMapper.writeValueAsString(args[0]);
-                if (params.length() > 2000) params = params.substring(0, 2000);
-                log.setParams(params);
+                if (params.length() > 500) params = params.substring(0, 500);
+                operationLog.setParams(params);
             }
         } catch (Exception ignored) {}
 
         // IP
-        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attrs != null) {
-            HttpServletRequest request = attrs.getRequest();
-            String ip = request.getHeader("X-Forwarded-For");
-            if (ip == null || ip.isBlank()) ip = request.getRemoteAddr();
-            log.setIp(ip);
-        }
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isBlank()) ip = request.getRemoteAddr();
+        operationLog.setIp(ip);
 
-        log.setCreateTime(LocalDateTime.now());
-        operationLogMapper.insert(log);
+        operationLog.setCreateTime(LocalDateTime.now());
+        operationLogMapper.insert(operationLog);
     }
 }
