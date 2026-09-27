@@ -96,11 +96,16 @@ public class OperationLogAspect {
         String action = getActionName(httpMethod, methodName);
         operationLog.setOperation(action + moduleCn);
 
-        // 请求参数（截断防止超长）
+        // 请求参数（截断防止超长，过滤敏感字段）
         try {
             Object[] args = joinPoint.getArgs();
             if (args != null && args.length > 0 && !(args[0] instanceof org.springframework.security.core.Authentication)) {
                 String params = objectMapper.writeValueAsString(args[0]);
+                // 过滤敏感字段
+                params = params.replaceAll("\"password\"\\s*:\\s*\"[^\"]*\"", "\"password\":\"***\"");
+                params = params.replaceAll("\"oldPassword\"\\s*:\\s*\"[^\"]*\"", "\"oldPassword\":\"***\"");
+                params = params.replaceAll("\"newPassword\"\\s*:\\s*\"[^\"]*\"", "\"newPassword\":\"***\"");
+                params = params.replaceAll("\"token\"\\s*:\\s*\"[^\"]*\"", "\"token\":\"***\"");
                 if (params.length() > 500) params = params.substring(0, 500);
                 operationLog.setParams(params);
             }
